@@ -40,3 +40,21 @@ socket.on('busyServer', function() {
 
 });
 ```
+
+### The "User" Object
+```
+user.id: 0.9937238372864,
+user.balance: 4182,
+user.name: "foobar",
+user.checkedOutBlock: 1431
+```
+
+To create a user:
+`socket.emit('createUser', "foobar1");`
+
+And watch out for:
+```
+socket.on('userCreated', function(data) {
+
+
+});

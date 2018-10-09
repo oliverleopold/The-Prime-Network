@@ -9,8 +9,9 @@ var maxBlockSize = 5000;
 
 //define variables
 var SOCKETS = {};
-var BLOCKS = {};
+var ACTIVE_BLOCKS = {};
 var USERS = {};
+var ARCHIVED_BLOCKS  = {};
 
 var allocateBlocks = 0;
 allocateBlocks = calculateBlockAllocation(0);
@@ -56,7 +57,33 @@ io.sockets.on('connection', function(socket){
   socket.on('requestNewBlock', function(data) {
 
     var serverUser = USERS[data.id];
+    if (serverUser.checkedOutBlock) {
 
+      var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
+      while (newBlock.submitted[serverUser.id])
+      {
+        newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
+      }
+      serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
+      socket.emit('incomingBlock', ACTIVE_BLOCKS[serverUser.checkedOutBlock]);
+
+    }
+
+
+  });
+
+  socket.on('completedBlock', function(data) {
+
+    var serverUser = USERS[data.user.id];
+    if (serverUser.checkedOutBlock == block.number)
+    {
+//submit the block
+
+    } else {
+
+      console.log(colors.red("[Block Submission] ") + colors.green(serverUser.name) + colors.black(" turned in a block that wasn't checked out"));
+
+    }
 
   });
 
@@ -73,9 +100,9 @@ io.sockets.on('connection', function(socket){
 
 function maintainBlocks() {
 
-  if (allocateBlocks < BLOCKS.length) {
+  if (allocateBlocks < ACTIVE_BLOCKS.length) {
 
-    var createNBlocks = BLOCKS.length - allocateBlocks;
+    var createNBlocks = ACTIVE_BLOCKS.length - allocateBlocks;
     for (var x; x < createNBlocks; x++) {
 
       var block;
@@ -88,12 +115,12 @@ function maintainBlocks() {
 
       block = {
         number: (currentBlockNumber + 1),
-        startRange: (BLOCKS[currentBlockNumber].stopRange + 1),
-        stopRange: ((BLOCKS[currentBlockNumber].stopRange + 1) + blockSize)
+        startRange: (ACTIVE_BLOCKS[currentBlockNumber].stopRange + 1),
+        stopRange: ((ACTIVE_BLOCKS[currentBlockNumber].stopRange + 1) + blockSize)
 
       };
 
-      BLOCKS[block.number] = block;
+      ACTIVE_BLOCKS[block.number] = block;
 
       currentBlockNumber++;
 
