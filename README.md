@@ -15,19 +15,19 @@ Then, catch the incoming block:
 });`
 
 ### Submit a Completed Block
-`socket.emit("completedBlock", {
+```socket.emit("completedBlock", {
 
   account: user,
   block: block
 
-});`
+});```
 Then, catch the result:
-`socket.on('feedback', function(data) {
+```socket.on('feedback', function(data) {
 
   //make sure that the data.blockId is what you just submitted
   //data.status should come back as "recieved"
 
-});
+});```
 
 
 
