@@ -1,1 +1,1 @@
-# The-Prime-Network
+# The Prime Network
