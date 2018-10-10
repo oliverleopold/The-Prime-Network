@@ -50,7 +50,7 @@ consoleOutput("[Server] ".red + "Started on port " + port, 3);
 
 io.sockets.on('connection', function(socket){
 
-  if (SOCKETS.length >= max_peers)
+  if (getObjectsInList(SOCKETS) >= max_peers)
   {
     socket.emit('busyServer');
     socket.disconnect();
@@ -61,8 +61,7 @@ io.sockets.on('connection', function(socket){
   socket.id = Math.random();
   SOCKETS[socket.id] = socket;
 
-  allocateBlocks = calculateBlockAllocation(SOCKETS.length);
-console.log(SOCKETS.length);
+  allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
   consoleOutput("[Server] ".red + "New connection!", 1);
 
   socket.on('createNewUser', function(data) {
@@ -85,12 +84,12 @@ console.log(SOCKETS.length);
 
     var serverUser = USERS[data.id];
 
-    var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)];
+    var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))];
     while (newBlock.submitted[serverUser.id])
     {
-      newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
+      newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
     }
-    serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
+    serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
     socket.emit('incomingBlock', ACTIVE_BLOCKS[serverUser.checkedOutBlock]);
     consoleOutput("[Server] ".red + "Assigned a new block", 3);
 
@@ -116,7 +115,7 @@ console.log(SOCKETS.length);
 
       };
 
-      if (ACTIVE_BLOCKS[data.block.number].submitted.length == 0)
+      if (getObjectsInList(ACTIVE_BLOCKS[data.block.number].submitted) == 0)
       {
         ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + (24 * 60 * 60 * 1000);
       }
@@ -137,7 +136,7 @@ console.log(SOCKETS.length);
   socket.on('disconnect', function() {
 
     delete(SOCKETS[socket.id]);
-    allocateBlocks = calculateBlockAllocation(SOCKETS.length);
+    allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
     consoleOutput("[Server] ".red + "disconnect.", 1);
 
 
@@ -151,14 +150,14 @@ setInterval(function(){
 
   consoleOutput("[Hourly Task] ".red + "Checking for block expiration.".red, 3);
 
-  for (var i; i < ACTIVE_BLOCKS.length; i++)
+  for (var i; i < getObjectsInList(ACTIVE_BLOCKS); i++)
   {
     if (ACTIVE_BLOCKS[i].expiration < getCurrentMSTime())
     {
       consoleOutput("[Hourly Task] ".red + ("Block #" + i).green + " has expired", 2);
       var allBlockResultHashes = {};
 
-      for (var x; x < ACTIVE_BLOCKS[i].submitted.length; x++)
+      for (var x; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
       {
         var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
         if (!allBlockResultHashes[submittedObj.hash])
@@ -175,7 +174,7 @@ setInterval(function(){
       var largestVotedResult;
       var LVRVoteCount = 0;
 
-      for (var x; x < allBlockResultHashes.length; x++)
+      for (var x; x < getObjectsInList(allBlockResultHashes); x++)
       {
         if (allBlockResultHashes[x].votes > LVRVoteCount)
         {
@@ -191,7 +190,7 @@ setInterval(function(){
       var numberOfPrimes = 0;
       var finalList;
 
-      for (var x; x < ACTIVE_BLOCKS[i].submitted.length; x++)
+      for (var x; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
       {
         var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
         if (submittedObj.hash == largestVotedResult)
@@ -209,7 +208,7 @@ setInterval(function(){
       }
 
 
-      USERS[winnerId].balance += finalList.length;
+      USERS[winnerId].balance += getObjectsInList(finalList);
 
       ARCHIVED_BLOCKS[i] = {
         number: i,
@@ -217,7 +216,7 @@ setInterval(function(){
         stopRange: ACTIVE_BLOCKS[i].stopRange,
         finalHash: largestVotedResult,
         list: finalList,
-        numberOfPrimes: finalList.length,
+        numberOfPrimes: getObjectsInList(finalList),
         completed: getCurrentMSTime()
       };
 
@@ -240,13 +239,15 @@ setInterval(function() {
 
 function maintainBlocks() {
 
-  consoleOutput("[Server] ".red + "Maintaining blocks (ABL: " + ACTIVE_BLOCKS.length + ", Allocate: "+allocateBlocks+")", 4);
+  consoleOutput("[Server] ".red + "Maintaining blocks (ABL: " + getObjectsInList(ACTIVE_BLOCKS) + ", Allocate: "+allocateBlocks+")", 4);
 
 
-  if (allocateBlocks > ACTIVE_BLOCKS.length) {
+  if (allocateBlocks > getObjectsInList(ACTIVE_BLOCKS)) {
+    console.log('1');
 
-    var createNBlocks = allocateBlocks - ACTIVE_BLOCKS.length;
-    for (var x; x < createNBlocks; x++) {
+    var createNBlocks = allocateBlocks - getObjectsInList(ACTIVE_BLOCKS);
+    for (var xy; xy < createNBlocks; xy++) {
+      console.log('2');
 
       var block;
       var blockSize = Math.ceil(maxBlockSize-(0.0001*(currentBlockNumber^2)));
@@ -311,4 +312,13 @@ function consoleOutput(note, urgency)
   {
     console.log(note);
   }
+}
+
+function getObjectsInList(list)
+{
+  var count = 0;
+  for (var k in list) {
+    if (list.hasOwnProperty(k)) count++;
+  }
+  return count;
 }
