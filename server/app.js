@@ -2,7 +2,7 @@
 //config
 var port = 4013;
 var max_peers = 100; //0 = unlimited
-var mininmum_blocks = 300;
+var min_blocks = 300;
 var maximum_blocks = 1000;
 var minimumBlockSize = 200;
 var maxBlockSize = 5000;
@@ -22,6 +22,8 @@ var serv = require('http').Server(app);
 
 var colors = require('colors');
 
+var md5 = require('md5');
+
 var currentBlockNumber = 0;
 
 
@@ -29,9 +31,9 @@ var currentBlockNumber = 0;
 
 //start server
 app.get('/',function(req, res) {
-	res.sendFile(__dirname + '/client/index.html');
+	res.sendFile(__dirname + '/index.html');
 });
-app.use('/client',express.static(__dirname + '/client'));
+app.use('/',express.static(__dirname + '/'));
 
 serv.listen(port);
 
@@ -54,6 +56,9 @@ io.sockets.on('connection', function(socket){
 
   allocateBlocks = calculateBlockAllocation(SOCKETS.length);
 
+  console.log(colors.red("[Server] ") + colors.black("New connection!"));
+
+
   socket.on('requestNewBlock', function(data) {
 
     var serverUser = USERS[data.id];
@@ -75,9 +80,28 @@ io.sockets.on('connection', function(socket){
   socket.on('completedBlock', function(data) {
 
     var serverUser = USERS[data.user.id];
-    if (serverUser.checkedOutBlock == block.number)
+    if (serverUser.checkedOutBlock == data.block.number)
     {
-//submit the block
+
+      var hashedResult = md5(JSON.stringify(data.block.result));
+      var result = {
+
+        numbers: data.block.result,
+        hash: hashedResult,
+        userId: data.user.id,
+        time: getCurrentMSTime(),
+        list: data.block.result
+
+      };
+
+      if (ACTIVE_BLOCKS[data.block.number].submitted.length == 0)
+      {
+        ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + (24 * 60 * 60 * 1000);
+      }
+
+      ACTIVE_BLOCKS[data.block.number].submitted[data.user.id] = result;
+
+
 
     } else {
 
@@ -91,11 +115,98 @@ io.sockets.on('connection', function(socket){
 
     delete(SOCKETS[socket.id]);
     allocateBlocks = calculateBlockAllocation(SOCKETS.length);
+    console.log(colors.red("[Server] ") + colors.black("disconnect."));
+
 
   });
 
 
 });
+
+//runs every hour to check if any blocks have expired
+setInterval(function(){
+
+  console.log(colors.red("[Hourly Task] ") + colors.black("Checking for block expiration."));
+
+  for (var i; i < ACTIVE_BLOCKS.length; i++)
+  {
+    if (ACTIVE_BLOCKS[i].expiration < getCurrentMSTime())
+    {
+      console.log(colors.red("[Hourly Task] ") + colors.green("Block #" + i) + colors.black(" has expired"));
+      var allBlockResultHashes = {};
+
+      for (var x; x < ACTIVE_BLOCKS[i].submitted.length; x++)
+      {
+        var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
+        if (!allBlockResultHashes[submittedObj.hash])
+        {
+          var resultHolder;
+          resultHolder.hash = submittedObj.hash;
+          resultHolder.votes = 1;
+          allBlockResultHashes[submittedObj.hash]  = resultHolder;
+        } else {
+          allBlockResultHashes[submittedObj.hash].votes++;
+        }
+      }
+
+      var largestVotedResult;
+      var LVRVoteCount = 0;
+
+      for (var x; x < allBlockResultHashes.length; x++)
+      {
+        if (allBlockResultHashes[x].votes > LVRVoteCount)
+        {
+          largestVotedResult = allBlockResultHashes[x];
+          LVRVoteCount = allBlockResultHashes[x].votes;
+        }
+      }
+
+
+      var winnerId;
+      var winnerTime = 1E22;
+
+      var numberOfPrimes = 0;
+      var finalList;
+
+      for (var x; x < ACTIVE_BLOCKS[i].submitted.length; x++)
+      {
+        var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
+        if (submittedObj.hash == largestVotedResult)
+        {
+          if (winnerTime > submittedObj.time)
+          {
+            winnerId = submittedObj.userId;
+          }
+
+          finalList = submittedObj.result.list;
+
+        }
+
+
+      }
+
+
+      USERS[winnerId].balance += finalList.length;
+
+      ARCHIVED_BLOCKS[i] = {
+        number: i,
+        startRange: ACTIVE_BLOCKS[i].startRange,
+        stopRange: ACTIVE_BLOCKS[i].stopRange,
+        finalHash: largestVotedResult,
+        list: finalList,
+        numberOfPrimes: finalList.length,
+        completed: getCurrentMSTime()
+      };
+
+      delete(ACTIVE_BLOCKS[i]);
+
+
+
+    }
+
+  }
+
+}, (60 * 60 * 1000));
 
 
 function maintainBlocks() {
@@ -136,12 +247,12 @@ function calculateBlockAllocation(onlinePeers) {
   if (max_peers) {
 
     var block_allocation = ((onlinePeers / max_peers) * maximum_blocks);
-    if (block_allocation < minimum_blocks) {
+    if (block_allocation < min_blocks) {
 
-     block_allocation = minimum_blocks;
+     block_allocation = min_blocks;
 
     }
-    return ceil(block_allocation);
+    return Math.ceil(block_allocation);
 
   } else {
 
@@ -149,4 +260,8 @@ function calculateBlockAllocation(onlinePeers) {
   }
 
 
+}
+
+function getCurrentMSTime() {
+  return new Date().getTime();
 }
