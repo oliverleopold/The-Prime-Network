@@ -6,6 +6,9 @@ var min_blocks = 300;
 var maximum_blocks = 1000;
 var minimumBlockSize = 200;
 var maxBlockSize = 5000;
+var startingBalance = 0;
+
+var consoleUrgency = 4; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
 
 //define variables
 var SOCKETS = {};
@@ -14,7 +17,6 @@ var USERS = {};
 var ARCHIVED_BLOCKS  = {};
 
 var allocateBlocks = 0;
-allocateBlocks = calculateBlockAllocation(0);
 
 var express = require('express');
 var app = express();
@@ -25,6 +27,9 @@ var colors = require('colors');
 var md5 = require('md5');
 
 var currentBlockNumber = 0;
+
+allocateBlocks = calculateBlockAllocation(0);
+
 
 
 //import data
@@ -39,7 +44,7 @@ serv.listen(port);
 
 var io = require('socket.io')(serv,{});
 
-console.log(colors.red("[Server] ") + colors.black("Started on port " + port));
+consoleOutput("[Server] ".red + "Started on port " + port, 3);
 
 //socket handling
 
@@ -49,30 +54,47 @@ io.sockets.on('connection', function(socket){
   {
     socket.emit('busyServer');
     socket.disconnect();
+    consoleOutput("[Server] ".red + "Turned a socket away", 3);
+
   }
 
   socket.id = Math.random();
   SOCKETS[socket.id] = socket;
 
   allocateBlocks = calculateBlockAllocation(SOCKETS.length);
+console.log(SOCKETS.length);
+  consoleOutput("[Server] ".red + "New connection!", 1);
 
-  console.log(colors.red("[Server] ") + colors.black("New connection!"));
+  socket.on('createNewUser', function(data) {
 
+    var newUser = {
+      id: Math.random(),
+      balance: startingBalance,
+      name: data.username,
+      checkedOutBlock: null
+    }
+
+    USERS[newUser.id] = newUser;
+    socket.emit('userCreated', newUser);
+    consoleOutput("[Server] ".red + "Created a new user.", 3);
+
+
+  });
 
   socket.on('requestNewBlock', function(data) {
 
     var serverUser = USERS[data.id];
-    if (serverUser.checkedOutBlock) {
 
-      var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
-      while (newBlock.submitted[serverUser.id])
-      {
-        newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
-      }
-      serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
-      socket.emit('incomingBlock', ACTIVE_BLOCKS[serverUser.checkedOutBlock]);
-
+    var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)];
+    while (newBlock.submitted[serverUser.id])
+    {
+      newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
     }
+    serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*ACTIVE_BLOCKS.length)].number;
+    socket.emit('incomingBlock', ACTIVE_BLOCKS[serverUser.checkedOutBlock]);
+    consoleOutput("[Server] ".red + "Assigned a new block", 3);
+
+
 
 
   });
@@ -101,11 +123,12 @@ io.sockets.on('connection', function(socket){
 
       ACTIVE_BLOCKS[data.block.number].submitted[data.user.id] = result;
 
+      consoleOutput("[Server] ".red + "Turned in a block", 3);
 
 
     } else {
 
-      console.log(colors.red("[Block Submission] ") + colors.green(serverUser.name) + colors.black(" turned in a block that wasn't checked out"));
+      consoleOutput("[Block Submission] ".red + serverUser.name.green + " turned in a block that wasn't checked out", 2);
 
     }
 
@@ -115,7 +138,7 @@ io.sockets.on('connection', function(socket){
 
     delete(SOCKETS[socket.id]);
     allocateBlocks = calculateBlockAllocation(SOCKETS.length);
-    console.log(colors.red("[Server] ") + colors.black("disconnect."));
+    consoleOutput("[Server] ".red + "disconnect.", 1);
 
 
   });
@@ -126,13 +149,13 @@ io.sockets.on('connection', function(socket){
 //runs every hour to check if any blocks have expired
 setInterval(function(){
 
-  console.log(colors.red("[Hourly Task] ") + colors.black("Checking for block expiration."));
+  consoleOutput("[Hourly Task] ".red + "Checking for block expiration.".red, 3);
 
   for (var i; i < ACTIVE_BLOCKS.length; i++)
   {
     if (ACTIVE_BLOCKS[i].expiration < getCurrentMSTime())
     {
-      console.log(colors.red("[Hourly Task] ") + colors.green("Block #" + i) + colors.black(" has expired"));
+      consoleOutput("[Hourly Task] ".red + ("Block #" + i).green + " has expired", 2);
       var allBlockResultHashes = {};
 
       for (var x; x < ACTIVE_BLOCKS[i].submitted.length; x++)
@@ -209,11 +232,20 @@ setInterval(function(){
 }, (60 * 60 * 1000));
 
 
+setInterval(function() {
+
+  maintainBlocks();
+
+}, (1000));
+
 function maintainBlocks() {
 
-  if (allocateBlocks < ACTIVE_BLOCKS.length) {
+  consoleOutput("[Server] ".red + "Maintaining blocks (ABL: " + ACTIVE_BLOCKS.length + ", Allocate: "+allocateBlocks+")", 4);
 
-    var createNBlocks = ACTIVE_BLOCKS.length - allocateBlocks;
+
+  if (allocateBlocks > ACTIVE_BLOCKS.length) {
+
+    var createNBlocks = allocateBlocks - ACTIVE_BLOCKS.length;
     for (var x; x < createNBlocks; x++) {
 
       var block;
@@ -232,6 +264,8 @@ function maintainBlocks() {
       };
 
       ACTIVE_BLOCKS[block.number] = block;
+      consoleOutput("[Server] ".red + "Created new block, number " + block.number, 3);
+
 
       currentBlockNumber++;
 
@@ -244,6 +278,7 @@ function maintainBlocks() {
 
 function calculateBlockAllocation(onlinePeers) {
 
+
   if (max_peers) {
 
     var block_allocation = ((onlinePeers / max_peers) * maximum_blocks);
@@ -252,10 +287,14 @@ function calculateBlockAllocation(onlinePeers) {
      block_allocation = min_blocks;
 
     }
+    consoleOutput("[Server] ".red + "Calculated block allocation: " + Math.ceil(block_allocation) + " w/ input " + onlinePeers, 3);
+
     return Math.ceil(block_allocation);
 
   } else {
 
+    consoleOutput("[FATAL ERROR] WE DO NOT YET SUPPORT UNLIMITED PEERS.".red);
+    throw "1";
 
   }
 
@@ -264,4 +303,12 @@ function calculateBlockAllocation(onlinePeers) {
 
 function getCurrentMSTime() {
   return new Date().getTime();
+}
+
+function consoleOutput(note, urgency)
+{
+  if (urgency <= consoleUrgency)
+  {
+    console.log(note);
+  }
 }
