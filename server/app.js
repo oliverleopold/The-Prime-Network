@@ -7,6 +7,7 @@ var maximum_blocks = 1000;
 var minimumBlockSize = 200;
 var maxBlockSize = 5000;
 var startingBalance = 0;
+var blockLifespan = (24 * 60 * 60 * 1000); //a block's lifespan in MS
 
 var consoleUrgency = 3; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
 
@@ -98,6 +99,7 @@ io.sockets.on('connection', function(socket){
       number: ACTIVE_BLOCKS[serverUser.checkedOutBlock].number,
       startRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].startRange,
       stopRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].stopRange
+      
     }
 
 
@@ -128,8 +130,7 @@ io.sockets.on('connection', function(socket){
 
       if (getObjectsInList(ACTIVE_BLOCKS[data.block.number].submitted) == 0)
       {
-//        ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + (24 * 60 * 60 * 1000);
-          ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + (5 * 1000);
+          ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + blockLifespan;
 
       }
 
@@ -163,19 +164,20 @@ setInterval(function(){
 
   consoleOutput("[Hourly Task] ".red + "Checking for block expiration.".red, 3);
 
-  for (var i = 0; i < getObjectsInList(ACTIVE_BLOCKS); i++)
+  var ABKeys = Object.keys(ACTIVE_BLOCKS);
+  for (var i = 0; i < ABKeys.length; i++)
   {
     //FIX THE FORMATTING HERE!!!
-    if (ACTIVE_BLOCKS[i].hasOwnProperty('expiration')) {
+    if (ACTIVE_BLOCKS[ABKeys[i]].hasOwnProperty('expiration')) {
 
-    if (ACTIVE_BLOCKS[i].expiration < getCurrentMSTime())
+    if (ACTIVE_BLOCKS[ABKeys[i]].expiration < getCurrentMSTime())
     {
       consoleOutput("[Hourly Task] ".red + ("Block #" + i).green + " has expired", 2);
       var allBlockResultHashes = {};
 
-      for (var x = 0; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
+      for (var x = 0; x < getObjectsInList(ACTIVE_BLOCKS[ABKeys[i]].submitted); x++)
       {
-        var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
+        var submittedObj = ACTIVE_BLOCKS[ABKeys[i]].submitted[x];
         if (!allBlockResultHashes.hasOwnProperty(submittedObj.hash))
         {
           var resultHolder = {};
@@ -190,12 +192,14 @@ setInterval(function(){
       var largestVotedResult;
       var LVRVoteCount = 0;
 
-      for (var x = 0; x < getObjectsInList(allBlockResultHashes); x++)
+      var aBRHKeys = Object.keys(allBlockResultHashes);
+
+      for (var x = 0; x < aBRHKeys.length; x++)
       {
-        if (allBlockResultHashes[x].votes > LVRVoteCount)
+        if (allBlockResultHashes[aBRHKeys[x]].votes > LVRVoteCount)
         {
-          largestVotedResult = allBlockResultHashes[x];
-          LVRVoteCount = allBlockResultHashes[x].votes;
+          largestVotedResult = allBlockResultHashes[aBRHKeys[x]];
+          LVRVoteCount = allBlockResultHashes[aBRHKeys[x]].votes;
         }
       }
 
@@ -206,17 +210,17 @@ setInterval(function(){
       var numberOfPrimes = 0;
       var finalList;
 
-      for (var x = 0; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
+      for (var x = 0; x < getObjectsInList(ACTIVE_BLOCKS[ABKeys[i]].submitted); x++)
       {
-        var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
-        if (submittedObj.hash == largestVotedResult)
+        var submittedObj = ACTIVE_BLOCKS[ABKeys[i]].submitted[x];
+        if (submittedObj.hash == largestVotedResult.hash)
         {
           if (winnerTime > submittedObj.time)
           {
             winnerId = submittedObj.userId;
           }
 
-          finalList = submittedObj.result.list;
+          finalList = submittedObj.list;
 
         }
 
@@ -225,18 +229,20 @@ setInterval(function(){
 
 
       USERS[winnerId].balance += getObjectsInList(finalList);
+      consoleOutput("[Hourly Task] ".red + ("User '" + USERS[winnerId].name + "'").green + " has new balance: " + USERS[winnerId].balance, 2);
 
-      ARCHIVED_BLOCKS[i] = {
+
+      ARCHIVED_BLOCKS[ABKeys[i]] = {
         number: i,
-        startRange: ACTIVE_BLOCKS[i].startRange,
-        stopRange: ACTIVE_BLOCKS[i].stopRange,
+        startRange: ACTIVE_BLOCKS[ABKeys[i]].startRange,
+        stopRange: ACTIVE_BLOCKS[ABKeys[i]].stopRange,
         finalHash: largestVotedResult,
         list: finalList,
         numberOfPrimes: getObjectsInList(finalList),
         completed: getCurrentMSTime()
       };
 
-      delete(ACTIVE_BLOCKS[i]);
+      delete(ACTIVE_BLOCKS[ABKeys[i]]);
 
 
 
@@ -245,8 +251,7 @@ setInterval(function(){
 
   }
 
-// }, (60 * 60 * 1000));
-}, (1 * 1000));
+}, (60 * 60 * 1000));
 
 
 setInterval(function() {
