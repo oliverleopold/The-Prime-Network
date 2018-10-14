@@ -6,11 +6,6 @@ The Prime Network is a game where participants use their computer to find prime 
 You can play easily at https://oliverleopold.com/prime. No programming knowledge necessary OR you can download the "client" folder and edit away. `client/README.md` has specific functions and NodeJS usage.
 
 ## Blocks
-A block is simply a range of numbers that has a lifespan of 24 hours from first submission to expiration. Upon creation, a block is given a number and a range. The size of this range decreases over time to account for difficulty. Clients can start randomly requesting blocks from the server. 24 hours after it's first submission of answers, the server will  
+A block is simply a range of numbers that has a lifespan of 24 hours from first submission to expiration. Upon creation, a block is given a number and a range. The size of this range decreases over time to account for difficulty. Clients can start randomly requesting blocks from the server. 24 hours after it's first submission of answers, the server will determine a correct answer based on the most popular result. The first person that submitted that correct answer is awarded as many points as primes found in that block.
 
-
-A block is a range of 1,000 numbers. At any time, a client can request a block from the server and start working. Once the client has found all of the prime numbers inside the block, they will return it to the server. After a block is first submitted, it stays open for 24-hours. Once it closes, a correct answer will be determined based on the majority answer.
-
-The first person to have submitted the correct answer will recieve 85% of the primes as points. The second will recieve 5%, the third will recieve 2%, and all other correct answers will share the remaining 8%.
-
-The server generates blocks, and tries to have at least 300 open blocks at any given time, but will open up to 1,000 blocks at a time based on the current amount of traffic.
+The server maintains a certain amount of blocks at any given time, trying to adjust for traffic. Once a block expires, the server may create a new one. 
