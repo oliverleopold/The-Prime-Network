@@ -8,7 +8,7 @@ var minimumBlockSize = 200;
 var maxBlockSize = 5000;
 var startingBalance = 0;
 
-var consoleUrgency = 4; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
+var consoleUrgency = 3; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
 
 //define variables
 var SOCKETS = {};
@@ -26,7 +26,7 @@ var colors = require('colors');
 
 var md5 = require('md5');
 
-var currentBlockNumber = 0;
+var currentBlockNumber = -1;
 
 allocateBlocks = calculateBlockAllocation(0);
 
@@ -82,16 +82,27 @@ io.sockets.on('connection', function(socket){
 
   socket.on('requestNewBlock', function(data) {
 
-    var serverUser = USERS[data.id];
+    var serverUser = USERS[data.account.id];
+    consoleOutput("[Server] ".red + serverUser.id +" requested a new block", 3);
+
 
     var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))];
-    while (newBlock.submitted[serverUser.id])
+    while (newBlock.submitted.hasOwnProperty(serverUser.id))
     {
       newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
     }
     serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
-    socket.emit('incomingBlock', ACTIVE_BLOCKS[serverUser.checkedOutBlock]);
-    consoleOutput("[Server] ".red + "Assigned a new block", 3);
+
+    var publicBlock = {
+
+      number: ACTIVE_BLOCKS[serverUser.checkedOutBlock].number,
+      startRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].startRange,
+      stopRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].stopRange
+    }
+
+
+    socket.emit('incomingBlock', publicBlock);
+    consoleOutput("[Server] ".red + "Assigned block " + publicBlock.number, 3);
 
 
 
@@ -100,16 +111,16 @@ io.sockets.on('connection', function(socket){
 
   socket.on('completedBlock', function(data) {
 
-    var serverUser = USERS[data.user.id];
+    var serverUser = USERS[data.account.id];
     if (serverUser.checkedOutBlock == data.block.number)
     {
 
       var hashedResult = md5(JSON.stringify(data.block.result));
+
       var result = {
 
-        numbers: data.block.result,
         hash: hashedResult,
-        userId: data.user.id,
+        userId: data.account.id,
         time: getCurrentMSTime(),
         list: data.block.result
 
@@ -117,12 +128,14 @@ io.sockets.on('connection', function(socket){
 
       if (getObjectsInList(ACTIVE_BLOCKS[data.block.number].submitted) == 0)
       {
-        ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + (24 * 60 * 60 * 1000);
+//        ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + (24 * 60 * 60 * 1000);
+          ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + (5 * 1000);
+
       }
 
-      ACTIVE_BLOCKS[data.block.number].submitted[data.user.id] = result;
+      ACTIVE_BLOCKS[data.block.number].submitted.push(result);
 
-      consoleOutput("[Server] ".red + "Turned in a block", 3);
+      consoleOutput("[Server] ".red + "Turned in block " + data.block.number, 3);
 
 
     } else {
@@ -150,19 +163,22 @@ setInterval(function(){
 
   consoleOutput("[Hourly Task] ".red + "Checking for block expiration.".red, 3);
 
-  for (var i; i < getObjectsInList(ACTIVE_BLOCKS); i++)
+  for (var i = 0; i < getObjectsInList(ACTIVE_BLOCKS); i++)
   {
+    //FIX THE FORMATTING HERE!!!
+    if (ACTIVE_BLOCKS[i].hasOwnProperty('expiration')) {
+
     if (ACTIVE_BLOCKS[i].expiration < getCurrentMSTime())
     {
       consoleOutput("[Hourly Task] ".red + ("Block #" + i).green + " has expired", 2);
       var allBlockResultHashes = {};
 
-      for (var x; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
+      for (var x = 0; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
       {
         var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
-        if (!allBlockResultHashes[submittedObj.hash])
+        if (!allBlockResultHashes.hasOwnProperty(submittedObj.hash))
         {
-          var resultHolder;
+          var resultHolder = {};
           resultHolder.hash = submittedObj.hash;
           resultHolder.votes = 1;
           allBlockResultHashes[submittedObj.hash]  = resultHolder;
@@ -174,7 +190,7 @@ setInterval(function(){
       var largestVotedResult;
       var LVRVoteCount = 0;
 
-      for (var x; x < getObjectsInList(allBlockResultHashes); x++)
+      for (var x = 0; x < getObjectsInList(allBlockResultHashes); x++)
       {
         if (allBlockResultHashes[x].votes > LVRVoteCount)
         {
@@ -190,7 +206,7 @@ setInterval(function(){
       var numberOfPrimes = 0;
       var finalList;
 
-      for (var x; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
+      for (var x = 0; x < getObjectsInList(ACTIVE_BLOCKS[i].submitted); x++)
       {
         var submittedObj = ACTIVE_BLOCKS[i].submitted[x];
         if (submittedObj.hash == largestVotedResult)
@@ -225,10 +241,12 @@ setInterval(function(){
 
 
     }
+  }
 
   }
 
-}, (60 * 60 * 1000));
+// }, (60 * 60 * 1000));
+}, (1 * 1000));
 
 
 setInterval(function() {
@@ -243,11 +261,9 @@ function maintainBlocks() {
 
 
   if (allocateBlocks > getObjectsInList(ACTIVE_BLOCKS)) {
-    console.log('1');
 
     var createNBlocks = allocateBlocks - getObjectsInList(ACTIVE_BLOCKS);
-    for (var xy; xy < createNBlocks; xy++) {
-      console.log('2');
+    for (var i = 0; i < createNBlocks; i++) {
 
       var block;
       var blockSize = Math.ceil(maxBlockSize-(0.0001*(currentBlockNumber^2)));
@@ -257,12 +273,26 @@ function maintainBlocks() {
         blockSize = minimumBlockSize;
       }
 
-      block = {
-        number: (currentBlockNumber + 1),
-        startRange: (ACTIVE_BLOCKS[currentBlockNumber].stopRange + 1),
-        stopRange: ((ACTIVE_BLOCKS[currentBlockNumber].stopRange + 1) + blockSize)
+      if (!ACTIVE_BLOCKS[currentBlockNumber])
+      {
+        block = {
+          number: (currentBlockNumber + 1),
+          startRange: 1,
+          stopRange: blockSize,
+          submitted: []
 
-      };
+        };
+      } else {
+        block = {
+          number: (currentBlockNumber + 1),
+          startRange: (ACTIVE_BLOCKS[currentBlockNumber].stopRange + 1),
+          stopRange: ((ACTIVE_BLOCKS[currentBlockNumber].stopRange + 1) + blockSize),
+          submitted: []
+
+        };
+      }
+
+
 
       ACTIVE_BLOCKS[block.number] = block;
       consoleOutput("[Server] ".red + "Created new block, number " + block.number, 3);
@@ -288,7 +318,7 @@ function calculateBlockAllocation(onlinePeers) {
      block_allocation = min_blocks;
 
     }
-    consoleOutput("[Server] ".red + "Calculated block allocation: " + Math.ceil(block_allocation) + " w/ input " + onlinePeers, 3);
+    consoleOutput("[Server] ".red + "Calculated block allocation: " + Math.ceil(block_allocation) + " w/ input " + onlinePeers, 4);
 
     return Math.ceil(block_allocation);
 

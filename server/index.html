@@ -3,12 +3,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.4.5/socket.io.js"></script>
   </head>
   <body>
+    <span id='console'></span>
 
 
   <script type='text/javascript'>
 
-    var socket = io();
+  function isPrime(num) {
+    for(var i = 2; i < num; i++)
+      if(num % i === 0) return false;
+    return num !== 1 && num !== 0;
+  }
 
+    var socket = io();
+    var block;
     var user;
 
     socket.emit('createNewUser', {username: "oliver"});
@@ -18,7 +25,91 @@
       user = data;
       console.log(data);
 
+      writeToConsole("Create user "+user.id);
+
+      setTimeout(function() {
+
+        socket.emit("requestNewBlock", {account: user});
+
+      }, 1000);
+
+
+
     });
+
+
+    socket.on('incomingBlock', function(block) {
+
+      block = block;
+
+
+      //handle and process the "block" object
+      console.log(block);
+      writeToConsole("Assigned block #" + block.number);
+
+      block.result = processBlock(block);
+
+
+
+
+
+
+
+
+      writeToConsole("Submitting block #" + block.number);
+
+      socket.emit("completedBlock", {
+
+        account: user,
+        block: block
+
+      });
+
+      setTimeout(function() {
+
+        socket.emit("requestNewBlock", {account: user});
+
+      }, (60 * 1000));
+
+
+
+
+    });
+
+    function processBlock(block)
+    {
+      if (block.startRange % 2 == 0)
+      {
+        block.startRange++;
+      }
+
+      var currentlyChecking = block.startRange;
+      var primeNumbersInBlock = [];
+
+      while (currentlyChecking <= block.stopRange)
+      {
+        if (isPrime(currentlyChecking))
+        {
+          primeNumbersInBlock.push(currentlyChecking);
+
+        }
+
+        currentlyChecking = currentlyChecking + 2;
+      }
+
+      return primeNumbersInBlock;
+
+    }
+
+
+
+    function writeToConsole(input) {
+
+      document.getElementById('console').innerHTML += input;
+      document.getElementById('console').innerHTML += "<br>"
+      window.scrollTo(0,document.body.scrollHeight);
+
+    }
 
   </script>
   </body>

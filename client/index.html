@@ -18,6 +18,22 @@
       user = data;
       console.log(data);
 
+      setTimeout(function() {
+
+        socket.emit("requestNewBlock", {account: user});
+
+      }, 1000);
+
+
+
+    });
+
+
+    socket.on('incomingBlock', function(block) {
+
+      //handle and process the "block" object
+      console.log(block);
+
     });
 
   </script>
