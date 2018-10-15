@@ -9,7 +9,16 @@ var maxBlockSize = 5000;
 var startingBalance = 0;
 var blockLifespan = (24 * 60 * 60 * 1000); //a block's lifespan in MS
 
-var consoleUrgency = 3; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
+var consoleUrgency = 4; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
+
+var fileStorageSystem = {
+
+  "activeBlocks": "storage/activeBlocks.txt",
+  "archivedBlocks": "storage/archivedBlocks.txt",
+  "users": "storage/users.txt",
+  "settings": "storage/settings.txt"
+
+};
 
 //define variables
 var SOCKETS = {};
@@ -34,6 +43,34 @@ allocateBlocks = calculateBlockAllocation(0);
 
 
 //import data
+var fs = require('fs');
+
+fs.readFile(fileStorageSystem.users, function(err, data) {
+    if (data) {
+      USERS = JSON.parse(data);
+    } else {
+      consoleOutput("[FS] ".red + "( ! ) Users not imported.", 3);
+    }
+});
+
+fs.readFile(fileStorageSystem.activeBlocks, function(err, data) {
+    if (data) {
+      ACTIVE_BLOCKS = JSON.parse(data);
+    } else {
+      consoleOutput("[FS] ".red + "( ! ) Active Blocks not imported.", 3);
+    }
+});
+
+fs.readFile(fileStorageSystem.archivedBlocks, function(err, data) {
+    if (data) {
+      ARCHIVED_BLOCKS = JSON.parse(data);
+    } else {
+      consoleOutput("[FS] ".red + "( ! ) Archived Blocks not imported.", 3);
+    }
+});
+
+
+
 
 //start server
 app.get('/',function(req, res) {
@@ -68,16 +105,42 @@ io.sockets.on('connection', function(socket){
   socket.on('createNewUser', function(data) {
 
     var newUser = {
+
       id: Math.random(),
       balance: startingBalance,
       name: data.username,
       checkedOutBlock: null
+
     }
+
+    newUser.loginHash = md5(newUser.id + Math.random()) + md5(Math.random());
+    newUser.authentication = md5(newUser.loginHash + data.auth);
 
     USERS[newUser.id] = newUser;
     socket.emit('userCreated', newUser);
     consoleOutput("[Server] ".red + "Created a new user.", 3);
 
+
+  });
+
+  socket.on('authenticateUser', function(data) {
+
+    var usersList = Object.keys(USERS);
+    for (var x = 0; x < usersList.length; x++) {
+
+      var user = USERS[usersList[x]];
+
+      console.log(data);
+      console.log(user);
+
+      if (user.loginHash == data.loginHash && user.authentication == data.authentication)
+      {
+
+        socket.emit('userAuthenticated', user);
+
+      }
+
+    }
 
   });
 
@@ -99,7 +162,7 @@ io.sockets.on('connection', function(socket){
       number: ACTIVE_BLOCKS[serverUser.checkedOutBlock].number,
       startRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].startRange,
       stopRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].stopRange
-      
+
     }
 
 
@@ -138,10 +201,24 @@ io.sockets.on('connection', function(socket){
 
       consoleOutput("[Server] ".red + "Turned in block " + data.block.number, 3);
 
+      socket.emit('feedback', {
+
+        status: "recieved",
+        blockId: data.block.number
+
+      });
+
 
     } else {
 
       consoleOutput("[Block Submission] ".red + serverUser.name.green + " turned in a block that wasn't checked out", 2);
+
+      socket.emit('feedback', {
+
+        status: "ERR_NOT_CHECKED_OUT",
+        blockId: data.block.number
+
+      });
 
     }
 
@@ -259,6 +336,23 @@ setInterval(function() {
   maintainBlocks();
 
 }, (1000));
+
+setInterval(function() {
+
+  //save active blocks
+  fs.writeFile(fileStorageSystem.activeBlocks, JSON.stringify(ACTIVE_BLOCKS), function() {});
+
+  //save archived blocks
+  fs.writeFile(fileStorageSystem.archivedBlocks, JSON.stringify(ARCHIVED_BLOCKS), function() {});
+
+  //save users
+  fs.writeFile(fileStorageSystem.users, JSON.stringify(USERS), function() {});
+
+  consoleOutput("[FS] ".red + "Saving data to files", 4);
+
+
+
+}, (1000 * 10));
 
 function maintainBlocks() {
 
