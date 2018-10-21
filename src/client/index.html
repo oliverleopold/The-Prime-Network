@@ -7,7 +7,7 @@
   </head>
   <body>
 
-    <div align='center'>
+    <div align='center' id='authenticationPanel'>
       <h3 id='authentication_header'>Login</h3>
 
       <div class="mdl-textfield mdl-js-textfield">
@@ -29,11 +29,7 @@
 <br><br>
       <div id='spinner-login' class="mdl-spinner mdl-js-spinner"></div>
 
-  </div>
 
-
-
-  <div align='center'>
     <h3 id='authentication_header'>Create Account</h3>
 
     <div class="mdl-textfield mdl-js-textfield">
@@ -120,6 +116,7 @@ socket.on('userAuthenticated', function(data) {
 
   user = data;
   document.getElementById('spinner-login').classList.remove("is-active");
+  document.getElementById('authenticationPanel').style.display = "none";
 
 })
 
