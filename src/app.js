@@ -1,7 +1,7 @@
 
 //config
 var port = 4013;
-var max_peers = 100; 
+var max_peers = 2;
 var min_blocks = 300;
 var maximum_blocks = 1000;
 var minimumBlockSize = 200;
@@ -9,7 +9,7 @@ var maxBlockSize = 5000;
 var startingBalance = 0;
 var blockLifespan = (24 * 60 * 60 * 1000);
 
-var consoleUrgency = 2;
+var consoleUrgency = 3;
 
 var fileStorageSystem = {
 
@@ -78,9 +78,9 @@ fs.readFile(fileStorageSystem.archivedBlocks, function(err, data) {
 
 //start server
 app.get('/',function(req, res) {
-	res.sendFile(__dirname + '/index.html');
+	res.sendFile(__dirname + '/client/index.html');
 });
-app.use('/',express.static(__dirname + '/'));
+app.use('/',express.static(__dirname + '/client'));
 
 serv.listen(port);
 
@@ -98,144 +98,142 @@ io.sockets.on('connection', function(socket){
     socket.disconnect();
     consoleOutput("[Server] ".red + "Turned a socket away", 3);
 
-  }
+  } else {
 
-  socket.id = Math.random();
-  SOCKETS[socket.id] = socket;
+    socket.id = Math.random();
+    SOCKETS[socket.id] = socket;
 
-  allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
-  consoleOutput("[Server] ".red + "New connection!", 3);
-
-  socket.on('createNewUser', function(data) {
-
-    var newUser = {
-
-      id: Math.random(),
-      balance: startingBalance,
-      name: data.username,
-      checkedOutBlock: null
-
-    }
-
-    newUser.loginHash = md5(newUser.id + Math.random()) + md5(Math.random());
-    newUser.authentication = md5(newUser.loginHash + data.auth);
-
-    USERS[newUser.id] = newUser;
-    socket.emit('userCreated', newUser);
-    consoleOutput("[Server] ".red + "Created a new user.", 3);
-
-
-  });
-
-  socket.on('authenticateUser', function(data) {
-
-    var usersList = Object.keys(USERS);
-    for (var x = 0; x < usersList.length; x++) {
-
-      var user = USERS[usersList[x]];
-
-      console.log(data);
-      console.log(user);
-
-      if (user.loginHash == data.loginHash && user.authentication == data.authentication)
-      {
-
-        socket.emit('userAuthenticated', user);
-
-      }
-
-    }
-
-  });
-
-  socket.on('requestNewBlock', function(data) {
-
-    var serverUser = USERS[data.account.id];
-    consoleOutput("[Server] ".red + serverUser.id +" requested a new block", 3);
-
-
-    var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))];
-    while (newBlock.submitted.hasOwnProperty(serverUser.id))
-    {
-      newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
-    }
-    serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
-
-    var publicBlock = {
-
-      number: ACTIVE_BLOCKS[serverUser.checkedOutBlock].number,
-      startRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].startRange,
-      stopRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].stopRange
-
-    }
-
-
-    socket.emit('incomingBlock', publicBlock);
-    consoleOutput("[Server] ".red + "Assigned block " + publicBlock.number, 3);
-
-
-
-
-  });
-
-  socket.on('completedBlock', function(data) {
-
-    var serverUser = USERS[data.account.id];
-    if (serverUser.checkedOutBlock == data.block.number)
-    {
-
-      var hashedResult = md5(JSON.stringify(data.block.result));
-
-      var result = {
-
-        hash: hashedResult,
-        userId: data.account.id,
-        time: getCurrentMSTime(),
-        list: data.block.result
-
-      };
-
-      if (getObjectsInList(ACTIVE_BLOCKS[data.block.number].submitted) == 0)
-      {
-          ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + blockLifespan;
-
-      }
-
-      ACTIVE_BLOCKS[data.block.number].submitted.push(result);
-
-      consoleOutput("[Server] ".red + "Turned in block " + data.block.number, 3);
-
-      socket.emit('feedback', {
-
-        status: "recieved",
-        blockId: data.block.number
-
-      });
-
-
-    } else {
-
-      consoleOutput("[Block Submission] ".red + serverUser.name.green + " turned in a block that wasn't checked out", 2);
-
-      socket.emit('feedback', {
-
-        status: "ERR_NOT_CHECKED_OUT",
-        blockId: data.block.number
-
-      });
-
-    }
-
-  });
-
-  socket.on('disconnect', function() {
-
-    delete(SOCKETS[socket.id]);
     allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
-    consoleOutput("[Server] ".red + "disconnect.", 1);
+    consoleOutput("[Server] ".red + "New connection!", 3);
+
+    socket.on('createNewUser', function(data) {
+
+      var newUser = {
+
+        id: Math.random(),
+        balance: startingBalance,
+        name: data.username,
+        checkedOutBlock: null
+
+      }
+
+      newUser.loginHash = md5(newUser.id + Math.random()) + md5(Math.random());
+      newUser.authentication = md5(newUser.loginHash + data.auth);
+
+      USERS[newUser.id] = newUser;
+      socket.emit('userCreated', newUser);
+      consoleOutput("[Server] ".red + "Created a new user.", 3);
 
 
-  });
+    });
+
+    socket.on('authenticateUser', function(data) {
+
+      var usersList = Object.keys(USERS);
+      for (var x = 0; x < usersList.length; x++) {
+
+        var user = USERS[usersList[x]];
+
+        if (user.loginHash == data.loginHash && user.authentication == data.authentication)
+        {
+
+          socket.emit('userAuthenticated', user);
+
+        }
+
+      }
+
+    });
+
+    socket.on('requestNewBlock', function(data) {
+
+      var serverUser = USERS[data.account.id];
+      consoleOutput("[Server] ".red + serverUser.id +" requested a new block", 3);
+
+
+      var newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))];
+      while (newBlock.submitted.hasOwnProperty(serverUser.id))
+      {
+        newBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
+      }
+      serverUser.checkedOutBlock = ACTIVE_BLOCKS[Math.floor(Math.random()*getObjectsInList(ACTIVE_BLOCKS))].number;
+
+      var publicBlock = {
+
+        number: ACTIVE_BLOCKS[serverUser.checkedOutBlock].number,
+        startRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].startRange,
+        stopRange: ACTIVE_BLOCKS[serverUser.checkedOutBlock].stopRange
+
+      }
+
+
+      socket.emit('incomingBlock', publicBlock);
+      consoleOutput("[Server] ".red + "Assigned block " + publicBlock.number, 3);
+
+
+
+
+    });
+
+    socket.on('completedBlock', function(data) {
+
+      var serverUser = USERS[data.account.id];
+      if (serverUser.checkedOutBlock == data.block.number)
+      {
+
+        var hashedResult = md5(JSON.stringify(data.block.result));
+
+        var result = {
+
+          hash: hashedResult,
+          userId: data.account.id,
+          time: getCurrentMSTime(),
+          list: data.block.result
+
+        };
+
+        if (getObjectsInList(ACTIVE_BLOCKS[data.block.number].submitted) == 0)
+        {
+            ACTIVE_BLOCKS[data.block.number].expiration = getCurrentMSTime() + blockLifespan;
+
+        }
+
+        ACTIVE_BLOCKS[data.block.number].submitted.push(result);
+
+        consoleOutput("[Server] ".red + "Turned in block " + data.block.number, 3);
+
+        socket.emit('feedback', {
+
+          status: "recieved",
+          blockId: data.block.number
+
+        });
+
+
+      } else {
+
+        consoleOutput("[Block Submission] ".red + serverUser.name.green + " turned in a block that wasn't checked out", 2);
+
+        socket.emit('feedback', {
+
+          status: "ERR_NOT_CHECKED_OUT",
+          blockId: data.block.number
+
+        });
+
+      }
+
+    });
+
+    socket.on('disconnect', function() {
+
+      delete(SOCKETS[socket.id]);
+      allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
+      consoleOutput("[Server] ".red + "disconnect.", 3);
+
+
+    });
+  }
 
 
 });
