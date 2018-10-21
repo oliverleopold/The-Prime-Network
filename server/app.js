@@ -9,16 +9,23 @@ var maxBlockSize = 5000;
 var startingBalance = 0;
 var blockLifespan = (24 * 60 * 60 * 1000); //a block's lifespan in MS
 
-var consoleUrgency = 4; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
+var consoleUrgency = 2; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
 
 var fileStorageSystem = {
 
   "activeBlocks": "storage/activeBlocks.txt",
   "archivedBlocks": "storage/archivedBlocks.txt",
   "users": "storage/users.txt",
-  "settings": "storage/settings.txt"
+  "storageFolder": "storage/"
 
 };
+
+var fs = require('fs');
+
+if (!fs.existsSync(fileStorageSystem['storageFolder'])){
+    fs.mkdirSync(fileStorageSystem['storageFolder']);
+    consoleOutput("( OK ) Created storage folder", 1);
+}
 
 //define variables
 var SOCKETS = {};
@@ -41,15 +48,12 @@ var currentBlockNumber = -1;
 allocateBlocks = calculateBlockAllocation(0);
 
 
-
 //import data
-var fs = require('fs');
-
 fs.readFile(fileStorageSystem.users, function(err, data) {
     if (data) {
       USERS = JSON.parse(data);
     } else {
-      consoleOutput("[FS] ".red + "( ! ) Users not imported.", 3);
+      consoleOutput("[FS] ".red + "( ! ) Users not imported.", 1);
     }
 });
 
@@ -57,7 +61,7 @@ fs.readFile(fileStorageSystem.activeBlocks, function(err, data) {
     if (data) {
       ACTIVE_BLOCKS = JSON.parse(data);
     } else {
-      consoleOutput("[FS] ".red + "( ! ) Active Blocks not imported.", 3);
+      consoleOutput("[FS] ".red + "( ! ) Active Blocks not imported.", 1);
     }
 });
 
@@ -65,7 +69,7 @@ fs.readFile(fileStorageSystem.archivedBlocks, function(err, data) {
     if (data) {
       ARCHIVED_BLOCKS = JSON.parse(data);
     } else {
-      consoleOutput("[FS] ".red + "( ! ) Archived Blocks not imported.", 3);
+      consoleOutput("[FS] ".red + "( ! ) Archived Blocks not imported.", 1);
     }
 });
 
@@ -82,7 +86,7 @@ serv.listen(port);
 
 var io = require('socket.io')(serv,{});
 
-consoleOutput("[Server] ".red + "Started on port " + port, 3);
+consoleOutput("[Server] ".red + "Started on port " + port, 1);
 
 //socket handling
 
