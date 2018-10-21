@@ -1,1 +1,0 @@
-{"0.5456450345945068":{"id":0.5456450345945068,"balance":0,"name":"oliverleopold2","checkedOutBlock":null,"loginHash":"3ba6e2f4e365a123f1e00eb7ac1fc170c190c0d4e90c85fa52f56d9c1dffc5f7","authentication":"f3eee1b0fcea11bbf990d4064ad1e832"}}
