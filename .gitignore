@@ -1,4 +1,4 @@
-server/storage/
-server/node_modules/
+src/storage
+src/node_modules/
 .DS_Store
-server/DS_Store
+src/DS_Store

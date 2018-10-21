@@ -1,7 +1,7 @@
 
 //config
 var port = 4013;
-var max_peers = 100; //0 = unlimited
+var max_peers = 100; 
 var min_blocks = 300;
 var maximum_blocks = 1000;
 var minimumBlockSize = 200;
@@ -9,13 +9,13 @@ var maxBlockSize = 5000;
 var startingBalance = 0;
 var blockLifespan = (24 * 60 * 60 * 1000);
 
-var consoleUrgency = 2; //1 = only urgent messages, 2 = urgent and some non-urgent, 3 = all, 4 = debugging only
+var consoleUrgency = 2;
 
 var fileStorageSystem = {
 
-  "activeBlocks": "storage/activeBlocks.txt",
-  "archivedBlocks": "storage/archivedBlocks.txt",
-  "users": "storage/users.txt",
+  "activeBlocks": "storage/activeBlocks.prime",
+  "archivedBlocks": "storage/archivedBlocks.prime",
+  "users": "storage/users.prime",
   "storageFolder": "storage/"
 
 };
@@ -104,7 +104,7 @@ io.sockets.on('connection', function(socket){
   SOCKETS[socket.id] = socket;
 
   allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
-  consoleOutput("[Server] ".red + "New connection!", 1);
+  consoleOutput("[Server] ".red + "New connection!", 3);
 
   socket.on('createNewUser', function(data) {
 
