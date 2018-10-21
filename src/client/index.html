@@ -80,7 +80,8 @@ function createAccount() {
   socket.emit('createNewUser', {
 
     username: nickname,
-    auth: auth
+    auth: auth,
+    temp: false
 
   });
 

@@ -1,7 +1,7 @@
 
 //config
 var port = 4013;
-var max_peers = 2;
+var max_peers = 100;
 var min_blocks = 300;
 var maximum_blocks = 1000;
 var minimumBlockSize = 200;
@@ -39,7 +39,6 @@ var md5 = require('md5');
 var currentBlockNumber = -1;
 
 allocateBlocks = calculateBlockAllocation(0);
-
 
 //import data
 var fs = require('fs');
@@ -107,13 +106,14 @@ io.sockets.on('connection', function(socket){
     consoleOutput("[Server] ".red + "New connection!", 3);
 
     socket.on('createNewUser', function(data) {
-
+//FIX INDENTATION HERE
       var newUser = {
 
         id: Math.random(),
         balance: startingBalance,
         name: data.username,
-        checkedOutBlock: null
+        checkedOutBlock: null,
+        temporary: data.temp
 
       }
 
@@ -122,6 +122,7 @@ io.sockets.on('connection', function(socket){
 
       USERS[newUser.id] = newUser;
       socket.emit('userCreated', newUser);
+      SOCKET[socket.id].authUser = newUser;
       consoleOutput("[Server] ".red + "Created a new user.", 3);
 
 
@@ -138,6 +139,7 @@ io.sockets.on('connection', function(socket){
         {
 
           socket.emit('userAuthenticated', user);
+          SOCKET[socket.id].authUser = user;
 
         }
 
@@ -145,9 +147,9 @@ io.sockets.on('connection', function(socket){
 
     });
 
-    socket.on('requestNewBlock', function(data) {
+    socket.on('requestNewBlock', function() {
 
-      var serverUser = USERS[data.account.id];
+      var serverUser = USERS[SOCKET[socket.id].authUser.id];
       consoleOutput("[Server] ".red + serverUser.id +" requested a new block", 3);
 
 
@@ -177,7 +179,7 @@ io.sockets.on('connection', function(socket){
 
     socket.on('completedBlock', function(data) {
 
-      var serverUser = USERS[data.account.id];
+      var serverUser = USERS[SOCKET[socket.id].authUser.id];
       if (serverUser.checkedOutBlock == data.block.number)
       {
 
@@ -230,6 +232,12 @@ io.sockets.on('connection', function(socket){
       delete(SOCKETS[socket.id]);
       allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
       consoleOutput("[Server] ".red + "disconnect.", 3);
+
+      if (!SOCKETS[socket.id].authUser.temporary) {
+        delete(USERS[SOCKET[socket.id].authUser.id]);
+      } else {
+        consoleOutput("[Server] ".red + "disconnect & destoryed temp. user", 3);
+      }
 
 
     });
