@@ -7,7 +7,7 @@
   </head>
   <body>
 
-    <div align='center' id='authenticationPanel' style='display: none'>
+    <div align='center' id='authenticationPanel' style='display: normal'>
       <h3 id='authentication_header'>Login</h3>
 
       <div class="mdl-textfield mdl-js-textfield">
@@ -51,17 +51,21 @@ Create Account
 <br><br>
     <div id='spinner-create' class="mdl-spinner mdl-js-spinner"></div>
     <div id='feedback-create'></div>
+    <br><br>
+    <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect" onclick='createAccount()'>
+Enter as Temporary User
+</button>
 
 </div>
 
 
-<div id='mainPanel'>
+<div id='mainPanel' style='display: none'>
 
 <h3>OliverLeopold</h3>
-<h6>LoginHash: <code>c4a87c2a76e51b2c532633061663e9c043f61865ca950f0a1a178a9f46afb433</code><br>
-  Address: <code>OliverLeopold@82.c4a</code><br>
-Balance: <span id='balance'>0 primes</span><br>
-Status: <span id='status'><mark>Cannot connect to server</mark></span></h6>
+<h6>LoginHash: <code id='loginHash-panel'>-</code><br>
+  Address: <code id='address'>-</code><br>
+Balance: <span id='balance'>-</span> primes<br>
+Status: <span id='status'><mark>-</mark></span></h6>
 
 
 </div>
@@ -129,8 +133,14 @@ socket.on('userAuthenticated', function(data) {
   user = data;
   document.getElementById('spinner-login').classList.remove("is-active");
   document.getElementById('authenticationPanel').style.display = "none";
+  document.getElementById('mainPanel').style.display = "block";
+  document.getElementById('address').innerHTML = user.address;
+  document.getElementById('loginHash-panel').innerHTML = user.loginHash;
+  document.getElementById('balance').innerHTML = user.balance;
 
-})
+
+
+});
 
 
 

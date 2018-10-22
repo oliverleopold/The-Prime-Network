@@ -120,18 +120,32 @@ io.sockets.on('connection', function(socket){
       newUser.loginHash = md5(newUser.id + Math.random()) + md5(Math.random());
       newUser.authentication = md5(newUser.loginHash + data.auth);
 
-      var usersList = Object.keys(USERS);
-      var counterOfSameNickname = 0;
-      for(var x = 0; x<usersList.length; x++) {
 
-        var user = USERS[usersList[x]];
-        if (user.name == data.username) {
-          counterOfSameNickname++;
+
+      if (data.temp == true) {
+
+        var randomAddress = Math.random() * (10000000000000);
+        randomAddress = Math.ceil(randomAddress);
+        var address = "temp-" + randomAddress + "@" + counterOfSameNickname + "." + newUser.loginHash.substr(0, 3);
+
+      } else {
+
+        var usersList = Object.keys(USERS);
+        var counterOfSameNickname = 0;
+        for(var x = 0; x<usersList.length; x++) {
+
+          var user = USERS[usersList[x]];
+          if (user.name.toLowerCase() == data.username.toLowerCase()) {
+            counterOfSameNickname++;
+          }
+
         }
+
+        var address = data.username + "@" + counterOfSameNickname + "." + newUser.loginHash.substr(0, 3);
 
       }
 
-      var address = data.username + "@" + counterOfSameNickname + "." + newUser.loginHash.substr(0, 3);
+
       newUser.address = address;
 
       USERS[newUser.id] = newUser;
