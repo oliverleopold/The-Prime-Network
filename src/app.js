@@ -120,6 +120,20 @@ io.sockets.on('connection', function(socket){
       newUser.loginHash = md5(newUser.id + Math.random()) + md5(Math.random());
       newUser.authentication = md5(newUser.loginHash + data.auth);
 
+      var usersList = Object.keys(USERS);
+      var counterOfSameNickname = 0;
+      for(var x = 0; x<usersList.length; x++) {
+
+        var user = USERS[usersList[x]];
+        if (user.name == data.username) {
+          counterOfSameNickname++;
+        }
+
+      }
+
+      var address = data.username + "@" + counterOfSameNickname + "." + newUser.loginHash.substr(0, 3);
+      newUser.address = address;
+
       USERS[newUser.id] = newUser;
       socket.emit('userCreated', newUser);
       SOCKETS[socket.id].authUser = newUser;
@@ -229,9 +243,12 @@ io.sockets.on('connection', function(socket){
 
     socket.on('disconnect', function() {
 
-      if (SOCKETS[socket.id].authUser.hasOwnProperty("temporary")) {
-        if (!SOCKETS[socket.id].authUser.temporary)
+      if (SOCKETS[socket.id].hasOwnProperty("authUser") && SOCKETS[socket.id].authUser.hasOwnProperty("temporary")) {
+        if (!SOCKETS[socket.id].authUser.temporary) {
           delete(USERS[SOCKETS[socket.id].authUser.id]);
+        } else {
+          SOCKETS[socket.id].authUser.checkedOutBlock = null;
+        }
           consoleOutput("[Server] ".red + "disconnect & destoryed temp. user", 3);
       } else {
         consoleOutput("[Server] ".red + "disconnect.", 3);
@@ -239,7 +256,6 @@ io.sockets.on('connection', function(socket){
 
       delete(SOCKETS[socket.id]);
       allocateBlocks = calculateBlockAllocation(getObjectsInList(SOCKETS));
-
 
     });
   }
